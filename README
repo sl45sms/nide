@@ -1,0 +1,5 @@
+nide is an simple but powerful webIDE using the Nitrogen framework, EditArea and various JSquery plugins with the purpose to speed up Erlang/Nitrogen projects.
+
+The feeling to working with nide is the same as any desktop IDE, if you are using browser with modern javascript engine, using chrome/v8 is my recommend.
+
+Most of development of nide is done using early stages of nide itself :)
