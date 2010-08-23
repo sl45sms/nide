@@ -115,9 +115,8 @@ wf:f("<ul><li><a class=\"dir\" href=\"#\">~s</a><ul>~s</ul></li></ul>",[filename
 
 
 %>>>
-%show
-%This block shows the content of page for the current language.
-%If the user is logged in and have the rights to edit this page then show an edit button at the end of page.
+%Body
+%This block shows the content of page.
 %<<<
 body() ->
   Body =[#flash{},
