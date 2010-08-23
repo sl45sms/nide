@@ -1,3 +1,7 @@
+% nide - Nitrogen based web IDE for Nitrogen
+% Copyright (c) 2010 Panagiotis Skarvelis
+% See MIT-LICENSE for licensing information.
+
 -module(ide).
 
 -compile(export_all).
