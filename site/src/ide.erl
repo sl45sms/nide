@@ -69,7 +69,8 @@ $('.wfid_container').layout({
 
 $('.wfid_tab1').attr('id','tab1');//Do not change the order for the folowing
 $('.wfid_tab2').attr('id','tab2');//or else
-$('.wfid_tabs').tabs();           //tabs dont work
+$('.wfid_tab3').attr('id','tab3');//tabs dont work
+$('.wfid_tabs').tabs();           
 
 });	
 </script> 
@@ -119,6 +120,7 @@ wf:f("<ul><li><a class=\"dir\" href=\"#\">~s</a><ul>~s</ul></li></ul>",[filename
 %This block shows the content of page.
 %<<<
 body() ->
+  EnableShell = filelib:is_file("./site/src/nitre.erl"),
   Body =[#flash{},
     #hidden{id="hidden_data",text=""},%use this to hold the data before save
     #hidden{id="hidden_path",text=""},%use this to hold the path of file before save
@@ -128,11 +130,11 @@ body() ->
 #panel {id="container",body=[
 %%Top - North
     #panel {id="topbuttons", class="ui-layout-north", body=[ 
-                  #button { text="Refresh Tree", postback=refresh_tree },   
-                  #button { text="Save Current",actions=
+                  #button {id=bnrefresh, text="Refresh Tree", postback=refresh_tree },   
+                  #button {id=bnsave, text="Save Current",actions=
                       #event{type=click,                  
                       actions="var f=editAreaLoader.getCurrentFile('editor');var  Path=f.id; var Content = f.text; $('.wfid_hidden_data').attr('value', Content);$('.wfid_hidden_path').attr('value', Path); editAreaLoader.setFileEditedMode('editor', f.id, 0);",postback=save_current}}, 
-    #button { text="Compile!", postback=compile },
+    #button {id=bncompile, text="Compile!", postback=compile },
     #checkbox { id=compileonsave, text="Compile On Save", value="checked", checked=true,
     actions=#event{type=click,actions="if ($('.wfid_hidden_checkbox').val()=='checked') {$('.wfid_hidden_checkbox').attr('value', 'unchecked');} else {$('.wfid_hidden_checkbox').attr('value', 'checked');};"}} %#checkbox have bug!  
      ]},
@@ -142,11 +144,12 @@ body() ->
 
 
 %Footer - South    
-    #panel {id="footer", class="ui-layout-south",body=[
+   #panel {id="footer", class="ui-layout-south",body=[
    
-   #panel {id="tabs",body=[#list{body=[#listitem{body=[#link {text="Commands Log",url="#tab1",id="tablink"}]},#listitem{body=[#link { text="Report Log",url="#tab2",id="tablink"}]}]},
+   #panel {id="tabs",body=[#list{body=[ #listitem{body=[#link {text="Commands Log",url="#tab1",id="tablink"}]}, #listitem{body=[#link { text="Report Log",url="#tab2",id="tablink"}]}, #listitem{show_if = EnableShell ,body=[#link {text="Unix Shell",url="#tab3",id="tablink"}]} ]},
    #panel {id="tab1",body=[#textarea{id="cmdlog", text="Executed commands Log\n"}]},
-   #panel {id="tab2",body=[#textarea{id="reportlog", text="Report Log\n"}]}
+   #panel {id="tab2",body=[#textarea{id="reportlog", text="Report Log\n"}]},
+   #panel {show_if = EnableShell ,id="tab3",body=[#textarea{id="bashshell", text="Unix Shell\n"}]}
     ]}
    
     ]},
@@ -163,10 +166,17 @@ body() ->
 
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%% events %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
- 
+
 event(compile)->
 ExecTime = httpd_util:rfc1123_date(erlang:localtime()),
-wf:insert_bottom("cmdlog","("++ExecTime++") Execute Compile:\n"++os:cmd("./bin/dev compile")++"\n");
+Report = os:cmd("./bin/dev compile"),
+Error = string:str(Report, "Error"),
+if Error /= 0 -> 
+wf:wire(topbuttons, #effect{ effect=highlight, speed=4000,options=[{color, "#FF0000"}]});%highlight in red on error  
+true -> wf:wire(topbuttons, #effect{ effect=highlight, speed=500, options=[{color, "#00FF00"}]}) %highlight in green
+end,
+wf:insert_bottom("cmdlog","("++ExecTime++") Execute Compile:\n"++Report++"\n"),
+wf:wire("obj('cmdlog').scrollTop = obj('cmdlog').scrollHeight;");
 
 event(refresh_tree)->
 wf:info("tst"++wf:temp_id()),
@@ -181,7 +191,8 @@ Path = wf:qs("hidden_path"),
 Compile = wf:f("~s",[wf:qs("hidden_checkbox")]),
 file:write_file(Path,Content),%TODO check if file is writed, make backup before save
 if Compile == "checked" -> wf:insert_bottom("cmdLog","File saved, compile:\n"),event(compile); 
-true->wf:insert_bottom("cmdLog","File saved but not compiled\n") end;  
+true->wf:insert_bottom("cmdLog","File saved but not compiled\n") end,  
+wf:wire("obj('cmdlog').scrollTop = obj('cmdlog').scrollHeight;");
 
 %>>>
 %file clicked on tree for open
@@ -200,8 +211,8 @@ receive
 		{Port, {exit_status, Status}} ->{ok, Status};
 		{Port, eof} ->port_close(Port),{ok, eof};
 		{snap, Who} ->	Who ! { Port, Callback},tail_loop(Port, Callback);
-		stop ->	port_close(Port),{ok, stop};
-		_Any ->	tail_loop(Port, Callback) 
+		 stop ->	port_close(Port),{ok, stop};
+		 _Any ->	tail_loop(Port, Callback) 
 end.
 
 inittail(Callback) ->
@@ -211,4 +222,5 @@ inittail(Callback) ->
 
 display_tail(Content) ->
 	wf:insert_bottom("reportlog",wf:f("~s~n",[Content])),
+	wf:wire("obj('reportlog').scrollTop = obj('reportlog').scrollHeight;"),
 	wf:flush().
