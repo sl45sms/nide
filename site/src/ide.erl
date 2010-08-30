@@ -94,12 +94,13 @@ add_jstree_list(_, [], ListTreeWithType) -> ListTreeWithType;
 add_jstree_list(Dir, [H | T], ListTreeWithType) ->
   case file:read_link_info(Dir ++ "/" ++ H) of 
       {ok, {_,_,FileType,_,_,_,_,_,_,_,_,_,_,_}} ->
-   case FileType of                                     %TODO fix crash if file don't have extencion 
+   case FileType of                                     
        regular -> 
                  FileID= wf:temp_id(),
-                  wf:wire(FileID, #event { type=click, postback={open_file,Dir++"/"++H} }), 
-                 add_jstree_list(Dir, T, ["<li class=\""++ string:substr(filename:extension(H), 2)++" wfid_"++FileID++"\" ><a class=\""++ string:substr(filename:extension(H), 2)++"\" href=\"#\">" ++ H ++ "</a></li>"++io_lib:nl() | ListTreeWithType]);
-       
+                 DotExt = filename:extension(H),
+                 Extension = if length(DotExt) == 0 -> "noext"; true -> string:substr(DotExt, 2)  end, 
+                 wf:wire(FileID, #event { type=click, postback={open_file,Dir++"/"++H} }), 
+                 add_jstree_list(Dir, T, ["<li class=\""++Extension++" wfid_"++FileID++"\" ><a class=\""++Extension++"\" href=\"#\">" ++ H ++ "</a></li>"++io_lib:nl() | ListTreeWithType]); 
           directory -> add_jstree_list(Dir, T, ListTreeWithType ++ "<ul><li><a class=\"dir\" href=\"#\">"++ H ++ "</a>"++io_lib:nl()++"<ul>" ++ generate_jstree_htmllisting(Dir ++ "/" ++ H)++"</ul></li></ul>");
        _ -> add_jstree_list(Dir, T, ListTreeWithType)
     end;   
@@ -120,7 +121,7 @@ wf:f("<ul><li><a class=\"dir\" href=\"#\">~s</a><ul>~s</ul></li></ul>",[filename
 %This block shows the content of page.
 %<<<
 body() ->
-  EnableShell = filelib:is_file("./site/src/nitre.erl"),
+  EnableShell = filelib:is_file("./site/src/niter.erl"),
   Body =[#flash{},
     #hidden{id="hidden_data",text=""},%use this to hold the data before save
     #hidden{id="hidden_path",text=""},%use this to hold the path of file before save
@@ -149,7 +150,9 @@ body() ->
    #panel {id="tabs",body=[#list{body=[ #listitem{body=[#link {text="Commands Log",url="#tab1",id="tablink"}]}, #listitem{body=[#link { text="Report Log",url="#tab2",id="tablink"}]}, #listitem{show_if = EnableShell ,body=[#link {text="Unix Shell",url="#tab3",id="tablink"}]} ]},
    #panel {id="tab1",body=[#textarea{id="cmdlog", text="Executed commands Log\n"}]},
    #panel {id="tab2",body=[#textarea{id="reportlog", text="Report Log\n"}]},
-   #panel {show_if = EnableShell ,id="tab3",body=[#textarea{id="bashshell", text="Unix Shell\n"}]}
+   #panel {show_if = EnableShell ,id="tab3",body=[
+                                                (catch niter:shell())
+                                                            ]}
     ]}
    
     ]},
@@ -202,6 +205,19 @@ event({open_file,Path}) ->
 %   wf:wire(   wf:f("editAreaLoader.setValue(\"editor\",\"~s\");",[wf:js_escape(FileContents)]) ).
 wf:wire(   wf:f("editAreaLoader.openFile(\"editor\",{id: \"~s\", text: \"~s\", syntax: 'erlang',title: '~s'});",[Path,wf:js_escape(FileContents),filename:basename(Path)] ) ).
 
+%For Use to Niter plugin  
+api_event(sendtobash, _, Char) ->
+    wf:send(shell,{exec,Char}).
+
+writetoshell(Buffer)->
+  wf:flash("Interpret: "++Buffer),  
+%%   wf:insert_bottom(shell,Buffer),%Here have to go to esc codes interpreter
+   niter:interpreter(Buffer),%No need for catch here
+  wf:wire("obj('shell').scrollTop = obj('shell').scrollHeight;"),
+wf:flush().
+
+
+
 %REPORT LOG
 tail_loop(Port, Callback) ->
 receive
@@ -224,3 +240,5 @@ display_tail(Content) ->
 	wf:insert_bottom("reportlog",wf:f("~s~n",[Content])),
 	wf:wire("obj('reportlog').scrollTop = obj('reportlog').scrollHeight;"),
 	wf:flush().
+	
+
